@@ -1,6 +1,6 @@
 [project]
 name = "tarun-common"
-version = "0.2.2"
+version = "0.3.0"
 description = "Small helpers shared by Tarun's apps, so each lives in one place"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -10,10 +10,12 @@ dependencies = []
 # Each app already depends on the SDK itself; the extra is for this repo's own tests and
 # for an app that wants the package to bring it. Nothing imports it until a call is made.
 claude = ["anthropic>=1.4"]
+secrets = ["cryptography>=42"]
 
 [dependency-groups]
 dev = [
     "anthropic>=1.4",
+    "cryptography>=42",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "ruff>=0.8",

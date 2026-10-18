@@ -6,6 +6,7 @@ copy per project. Each module stands alone.
 | module | what | used by |
 |---|---|---|
 | `tarun_common.claude` | Claude model families → newest model, key checks, refusal fallback, friendly errors | Orange, Mango, SDE Prep, health-tracker, Resume Maker |
+| `tarun_common.secrets` | Fernet secrets at rest: key checks, clear errors, Resume Maker's key derivation | Orange, Mango, SDE Prep, Resume Maker |
 
 **Library, not a service.** These are thin wrappers; as a service they'd add a network
 hop, a port and a process that can be down. (Heavy shared things are services instead,
@@ -21,12 +22,12 @@ Pin a tag, so a change here never reaches an app until it opts in:
 
 ```toml
 # pyproject.toml
-dependencies = ["tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.2.2"]
+dependencies = ["tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.3.0"]
 ```
 
 ```text
 # requirements.txt
-tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.2.2
+tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.3.0
 ```
 
 Python 3.11+. No required dependencies: `anthropic` is the app's own dependency and is
@@ -86,6 +87,27 @@ def models(monkeypatch):
 
 What stays in each app: where the key is stored, which families it offers and how it
 describes them, prompts, the call ledger, and per-feature switches.
+
+## `tarun_common.secrets`
+
+Plain Fernet, byte for byte what the apps already stored, so existing ciphertexts keep
+decrypting. Each app keeps its own policy (which env var, and whether a missing key
+disables a feature, is generated, or is an error).
+
+```python
+from tarun_common.secrets import SecretBox, SecretKeyError   # not `import secrets`: stdlib
+
+box = SecretBox(settings.credential_key, name="CREDENTIAL_KEY")  # SecretKeyError if missing/bad
+token = box.encrypt("sk-ant-…")
+box.decrypt(token)            # SecretKeyError if the key changed or the value is corrupt
+box.decrypt_or_none(token)    # None instead, for callers that fall back
+box.encrypt_bytes(b"…") / box.decrypt_bytes(b"…")
+```
+
+`generate_key()` makes a new key; `derive_key(secret, purpose)` is Resume Maker's
+`urlsafe_b64(sha256("<purpose>:<secret>"))` scheme, kept for its stored values. Needs
+`cryptography` (every app already has it; extra `secrets`), imported only when a box is
+made.
 
 ## Develop
 

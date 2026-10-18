@@ -159,7 +159,9 @@ def _cached(api_key: str, base_url: str | None) -> dict[str, NewestModel] | None
 
 
 def _client_options(api_key: str, base_url: str | None) -> dict[str, Any]:
-    options: dict[str, Any] = {"api_key": api_key, "max_retries": 1, "timeout": 20}
+    options: dict[str, Any] = {"max_retries": 1, "timeout": 20}
+    if api_key:  # empty: the SDK reads ANTHROPIC_API_KEY itself
+        options["api_key"] = api_key
     if base_url:
         options["base_url"] = base_url
     return options

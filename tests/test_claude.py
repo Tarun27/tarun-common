@@ -276,3 +276,10 @@ def test_importing_the_module_does_not_import_anthropic():
     code = "import sys, tarun_common.claude; print('anthropic' in sys.modules)"
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert out.stdout.strip() == "False", out.stderr
+
+
+async def test_an_empty_key_lets_the_sdk_read_the_environment(api):
+    await claude.newest_by_family("")
+    assert "api_key" not in api["options"]
+    await claude.newest_by_family("sk-ant-1")
+    assert api["options"]["api_key"] == "sk-ant-1"

@@ -1,6 +1,6 @@
 [project]
 name = "tarun-common"
-version = "0.2.0"
+version = "0.2.1"
 description = "Small helpers shared by Tarun's apps, so each lives in one place"
 readme = "README.md"
 requires-python = ">=3.11"

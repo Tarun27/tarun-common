@@ -21,12 +21,12 @@ Pin a tag, so a change here never reaches an app until it opts in:
 
 ```toml
 # pyproject.toml
-dependencies = ["tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.2.0"]
+dependencies = ["tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.2.1"]
 ```
 
 ```text
 # requirements.txt
-tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.2.0
+tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.2.1
 ```
 
 Python 3.11+. No required dependencies: `anthropic` is the app's own dependency and is

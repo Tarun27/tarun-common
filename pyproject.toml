@@ -1,0 +1,38 @@
+[project]
+name = "tarun-common"
+version = "0.1.0"
+description = "Small helpers shared by Tarun's apps, so each lives in one place"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+# Each app already depends on the SDK itself; the extra is for this repo's own tests and
+# for an app that wants the package to bring it. Nothing imports it until a call is made.
+claude = ["anthropic>=1.4"]
+
+[dependency-groups]
+dev = [
+    "anthropic>=1.4",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tarun_common"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -21,12 +21,12 @@ Pin a tag, so a change here never reaches an app until it opts in:
 
 ```toml
 # pyproject.toml
-dependencies = ["tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.1.0"]
+dependencies = ["tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.2.0"]
 ```
 
 ```text
 # requirements.txt
-tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.1.0
+tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.2.0
 ```
 
 Python 3.11+. No required dependencies: `anthropic` is the app's own dependency and is
@@ -70,6 +70,19 @@ Every lookup function has a `_sync` twin (`newest_by_family_sync`, `newest_model
 `ClaudeError.kind` is one of `auth`, `permission`, `not_found`, `rate_limit`,
 `overloaded`, `connection`, `status`, `no_model`; `status_code` is a sensible default that
 an app may map to its own.
+
+### Testing an app that uses it
+
+`tarun_common.claude_testing.fake_models(monkeypatch, [(id, released, display_name), …])`
+replaces only the Models API listing; the cache, `refresh`, the known-model fallback and
+`verify` run for real, and the cache starts empty each test. It returns a `FakeModels`
+whose `calls` counts lookups and whose `models` / `error` can change mid-test.
+
+```python
+@pytest.fixture(autouse=True)
+def models(monkeypatch):
+    return fake_models(monkeypatch, [("claude-haiku-5-5", 2.0, "Claude Haiku 5.5")])
+```
 
 What stays in each app: where the key is stored, which families it offers and how it
 describes them, prompts, the call ledger, and per-feature switches.

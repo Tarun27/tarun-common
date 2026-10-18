@@ -167,6 +167,29 @@ def _client_options(api_key: str, base_url: str | None) -> dict[str, Any]:
 
 # ── which model a family runs on ─────────────────────────────────────────────
 
+# The only two places that talk to Anthropic's Models API. `tarun_common.claude_testing`
+# replaces them in app tests, so caching and refresh still run for real.
+
+
+async def _list_async(api_key: str, base_url: str | None) -> list[Any]:
+    import anthropic
+
+    client = anthropic.AsyncAnthropic(**_client_options(api_key, base_url))
+    try:
+        return [m async for m in client.models.list(limit=1000)]
+    finally:
+        await client.close()
+
+
+def _list_sync(api_key: str, base_url: str | None) -> list[Any]:
+    import anthropic
+
+    client = anthropic.Anthropic(**_client_options(api_key, base_url))
+    try:
+        return list(client.models.list(limit=1000))
+    finally:
+        client.close()
+
 
 async def newest_by_family(
     api_key: str, *, base_url: str | None = None, refresh: bool = False
@@ -175,13 +198,7 @@ async def newest_by_family(
     Anthropic even when cached. Raises the SDK's errors."""
     if not refresh and (hit := _cached(api_key, base_url)) is not None:
         return hit
-    import anthropic
-
-    client = anthropic.AsyncAnthropic(**_client_options(api_key, base_url))
-    try:
-        newest = _pick([m async for m in client.models.list(limit=1000)])
-    finally:
-        await client.close()
+    newest = _pick(await _list_async(api_key, base_url))
     _store(api_key, base_url, newest)
     return newest
 
@@ -192,13 +209,7 @@ def newest_by_family_sync(
     """`newest_by_family` for apps on the synchronous SDK."""
     if not refresh and (hit := _cached(api_key, base_url)) is not None:
         return hit
-    import anthropic
-
-    client = anthropic.Anthropic(**_client_options(api_key, base_url))
-    try:
-        newest = _pick(client.models.list(limit=1000))
-    finally:
-        client.close()
+    newest = _pick(_list_sync(api_key, base_url))
     _store(api_key, base_url, newest)
     return newest
 

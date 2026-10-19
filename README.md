@@ -8,6 +8,10 @@ copy per project. Each module stands alone.
 | `tarun_common.claude` | Claude model families → newest model, key checks, refusal fallback, friendly errors | Orange, Mango, SDE Prep, health-tracker, Resume Maker |
 | `tarun_common.secrets` | Fernet secrets at rest: key checks, clear errors, Resume Maker's key derivation | Orange, Mango, SDE Prep, Resume Maker |
 | `tarun_common.ai_fallback` | Free providers with fallback: Groq → OpenRouter → Gemini | Orange, IRA |
+| `tarun_common.backup` | Admin backups: download a dump, load one (or a nightly snapshot) into a validation DB read-only, switch back | Orange, SDE Prep, IRA |
+
+Which apps use which module, and why each piece is shared, is tracked in
+[shared-stack](https://github.com/Tarun27/shared-stack) (private) — the map across all apps.
 
 **Library, not a service.** These are thin wrappers; as a service they'd add a network
 hop, a port and a process that can be down. (Heavy shared things are services instead,
@@ -23,12 +27,12 @@ Pin a tag, so a change here never reaches an app until it opts in:
 
 ```toml
 # pyproject.toml
-dependencies = ["tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.4.0"]
+dependencies = ["tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.5.0"]
 ```
 
 ```text
 # requirements.txt
-tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.4.0
+tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.5.0
 ```
 
 Python 3.11+. No required dependencies: `anthropic` is the app's own dependency and is
@@ -131,6 +135,60 @@ fail, never raises. `only="gemini"` uses one provider (`None`/`"auto"`: all).
 `on_call(CallRecord)` (sync or async) sees every HTTP attempt — provider, model, status,
 latency, ok — for an app's ledger; its own failures are swallowed. Groq's `gpt-oss`
 models are sent `reasoning_effort: "low"`. Needs `httpx` (extra `ai`), imported per call.
+
+## `tarun_common.backup`
+
+The admin page's backup flow, which Orange, SDE Prep and IRA each had a copy of: download
+a dump of the live database, load a dump into a separate **validation** database and
+browse the app read-only against it, switch back. A dump is never loaded over the live
+database from the app — that is disaster recovery, done outside it.
+
+```python
+from tarun_common import backup
+
+validation = backup.Validation(
+    settings.database_url,
+    settings.backup_test_url,             # empty → validation mode is off
+    on_switch=db_manager.use,             # app hook: point sessions at "primary"/"validation"
+)
+app.add_middleware(backup.ReadOnlyMiddleware, validation=validation,
+                   allow=("/api/admin/backup/", "/api/auth/"))
+app.include_router(
+    backup.router(validation, filename_prefix="orange",
+                  snapshots_root="~/Backups/local-apps",   # optional: nightly snapshots
+                  dependencies=[Depends(require_admin)]),
+    prefix="/api/admin/backup",
+)
+```
+
+| endpoint | |
+|---|---|
+| `GET /status` | mode, read-only, what is loaded, whether snapshots are configured |
+| `GET /export` | streamed plain-SQL `pg_dump` of the live database (no owners/grants) |
+| `GET /snapshots` | nightly dumps of this database, newest first |
+| `POST /restore-snapshot` `{"stamp"}` | load a nightly snapshot into validation |
+| `POST /restore-upload` (multipart `file`) | load an uploaded dump (plain SQL or custom format) |
+| `POST /restore-path` `{"path"}` | load a dump on the server's disk; `restore_roots=[…]` confines it |
+| `POST /switch-primary` | back to the live database |
+
+Loading runs `on_switch("primary")` first, replaces the validation database's `public`
+schema (plain SQL through psql, custom format through pg_restore, both stopping at the
+first error, owners and grants skipped), then `on_switch("validation")`. A failed load
+leaves the app on primary. `snapshots_root` is a folder laid out as
+`<root>/db/<YYYY-MM-DD_HHMMSS>/<server>/<database>.dump`.
+
+| function | |
+|---|---|
+| `pg_target(url)` | SQLAlchemy/libpq URL → `PgTarget(dbname, args, env)`; password only in `env` |
+| `dump_chunks(url)` | streaming plain-SQL dump; raises `BackupError` at the end if pg_dump failed |
+| `restore(target_url, source)` | replace `public` from a path, bytes or file object |
+| `snapshots(root, dbname)` | `[Snapshot(stamp, path, bytes, created_at)]`, newest first |
+| `Validation(...)` / `ReadOnlyMiddleware` / `router(...)` | as above |
+
+Needs `pg_dump`, `pg_restore` and `psql` on the PATH, and `fastapi` + `python-multipart`
+for the router (`tarun-common[backup]`). Limitation: replacing `public` drops extensions
+installed there, and a non-superuser role can't recreate a superuser-only one (pgvector),
+so an app whose schema needs one (Mango) can't use validation loads as they are.
 
 ## Develop
 

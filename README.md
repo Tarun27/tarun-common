@@ -7,6 +7,7 @@ copy per project. Each module stands alone.
 |---|---|---|
 | `tarun_common.claude` | Claude model families → newest model, key checks, refusal fallback, friendly errors | Orange, Mango, SDE Prep, health-tracker, Resume Maker |
 | `tarun_common.secrets` | Fernet secrets at rest: key checks, clear errors, Resume Maker's key derivation | Orange, Mango, SDE Prep, Resume Maker |
+| `tarun_common.ai_fallback` | Free providers with fallback: Groq → OpenRouter → Gemini | Orange, IRA |
 
 **Library, not a service.** These are thin wrappers; as a service they'd add a network
 hop, a port and a process that can be down. (Heavy shared things are services instead,
@@ -22,12 +23,12 @@ Pin a tag, so a change here never reaches an app until it opts in:
 
 ```toml
 # pyproject.toml
-dependencies = ["tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.3.0"]
+dependencies = ["tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.4.0"]
 ```
 
 ```text
 # requirements.txt
-tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.3.0
+tarun-common @ git+https://github.com/Tarun27/tarun-common@v0.4.0
 ```
 
 Python 3.11+. No required dependencies: `anthropic` is the app's own dependency and is
@@ -108,6 +109,28 @@ box.encrypt_bytes(b"…") / box.decrypt_bytes(b"…")
 `urlsafe_b64(sha256("<purpose>:<secret>"))` scheme, kept for its stored values. Needs
 `cryptography` (every app already has it; extra `secrets`), imported only when a box is
 made.
+
+## `tarun_common.ai_fallback`
+
+```python
+from tarun_common import ai_fallback
+
+providers = ai_fallback.providers_from(
+    groq_key=s.groq_api_key, groq_model=s.groq_model,          # models default to DEFAULT_MODELS
+    openrouter_key=s.openrouter_api_key, openrouter_model=s.openrouter_model,
+    gemini_key=s.gemini_api_key, gemini_model=s.gemini_model,
+    app_name="Orange", app_url="https://orange.local",          # OpenRouter attribution
+)
+text = await ai_fallback.generate(providers, prompt, max_tokens=512, only=None, on_call=ledger)
+```
+
+Providers without a key are skipped. A 429 is retried (2 s, 4 s) before the next provider;
+any other failure moves on at once. A 4xx other than 429 means misconfigured, so it is
+logged as an ERROR naming `<PROVIDER>_API_KEY` / `<PROVIDER>_MODEL`. Returns None when all
+fail, never raises. `only="gemini"` uses one provider (`None`/`"auto"`: all).
+`on_call(CallRecord)` (sync or async) sees every HTTP attempt — provider, model, status,
+latency, ok — for an app's ledger; its own failures are swallowed. Groq's `gpt-oss`
+models are sent `reasoning_effort: "low"`. Needs `httpx` (extra `ai`), imported per call.
 
 ## Develop
 

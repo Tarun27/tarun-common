@@ -1,6 +1,6 @@
 [project]
 name = "tarun-common"
-version = "0.4.0"
+version = "0.5.0"
 description = "Small helpers shared by Tarun's apps, so each lives in one place"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,12 +12,16 @@ dependencies = []
 claude = ["anthropic>=1.4"]
 secrets = ["cryptography>=42"]
 ai = ["httpx>=0.27"]
+# Only `backup.router()` needs these; the rest of the module is stdlib + the pg tools.
+backup = ["fastapi>=0.110", "python-multipart>=0.0.9"]
 
 [dependency-groups]
 dev = [
     "anthropic>=1.4",
     "cryptography>=42",
+    "fastapi>=0.110",
     "httpx>=0.27",
+    "python-multipart>=0.0.9",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "ruff>=0.8",
